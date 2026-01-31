@@ -1,0 +1,27 @@
+[package]
+name = "dfnotes"
+version = "0.1.0"
+edition = "2024"
+description = "Fastest Text Editor"
+authors = ["nic-wq (GitHub"]
+license = "GPL-3.0"
+
+[dependencies]
+eframe = "0.27"
+rfd = "0.14"
+rayon = "1.10"
+crossbeam-channel = "0.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[package.metadata.deb]
+maintainer = "Nic-wq (GitHub)"
+copyright = "2024, Nicolas"
+license-file = ["LICENSE", "0"]
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/dfnotes", "usr/bin/dfnotes", "755"],
+    ["dfnotes.desktop", "usr/share/applications/dfnotes.desktop", "644"],
+]

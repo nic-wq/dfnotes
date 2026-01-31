@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=DFNotes
+Comment=Fastest Text Editor
+Exec=dfnotes
+Icon=dfnotes
+Terminal=false
+Categories=Utility;TextEditor;
+Keywords=Notes;Text;Markdown;Editor;
