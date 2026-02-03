@@ -71,13 +71,16 @@ jobs:
           cp target/release/dfnotes dist_macos/
           dmgbuild -s /dev/null -D app_folder=dist_macos "dfnotes" dfnotes-macos.dmg
 
-      # --- GENERATE HASHES ---
+
+# --- GENERATE HASHES (Cross-platform compatible) ---
       - name: Generate SHA-256 Hashes
         shell: bash
         run: |
           for file in dfnotes-*; do
             if [ -f "$file" ]; then
-              shasum -a 256 "$file" > "${file}.sha256"
+              # sha256sum works on Linux, macOS, and Windows (via GitHub's bash)
+              sha256sum "$file" > "${file}.sha256"
+              echo "Generated hash for $file"
             fi
           done
 
