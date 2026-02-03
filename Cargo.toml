@@ -30,3 +30,8 @@ assets = [
     ["dfnotes.desktop", "usr/share/applications/dfnotes.desktop", "644"],
     ["assets/dfnotes.png", "usr/share/icons/hicolor/512x512/apps/dfnotes.png", "644"],
 ]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/dfnotes", dest = "/usr/bin/dfnotes", mode = "755" }
+]

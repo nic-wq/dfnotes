@@ -7,21 +7,21 @@ on:
 
 jobs:
   build:
-    name: Build and Package
+    name: Build e Packaging
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: linux-packages
+            artifact_name: pacotes-linux
           - os: windows-latest
-            artifact_name: windows-packages
+            artifact_name: pacotes-windows
           - os: macos-latest
-            artifact_name: macos-binaries
+            artifact_name: binario-macos
 
     steps:
-    - name: Checkout code
+    - name: Checkout do código
       uses: actions/checkout@v4
 
     - name: Install Rust toolchain
@@ -30,41 +30,40 @@ jobs:
     - name: Rust Cache
       uses: Swatinem/rust-cache@v2
 
-    # --- LINUX SPECIFIC STEPS ---
-    - name: Install Packaging Tools (Linux)
+    # --- LINUX (Debian, RPM, IMG) ---
+    - name: Build e Pacotes (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: |
-        cargo install cargo-deb
-        cargo install cargo-generate-rpm
-
-    - name: Build and Package (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
+        # Instala as ferramentas de empacotamento
+        cargo install cargo-deb cargo-generate-rpm
+        
         cargo build --release
-        # Generate .deb
+        
+        # Gera o .deb
         cargo deb --no-build --output dfnotes.deb
-        # Generate .rpm
+        
+        # Gera o .rpm (agora com os metadados do Cargo.toml)
         cargo generate-rpm --output dfnotes.rpm
-        # Generate .img (Copying binary to img format)
+        
+        # Gera o .img (cópia simples do binário)
         cp target/release/dfnotes dfnotes.img
 
-    # --- WINDOWS SPECIFIC STEPS ---
+    # --- WINDOWS (.exe) ---
     - name: Build (Windows)
       if: matrix.os == 'windows-latest'
       run: |
         cargo build --release
         copy target\release\dfnotes.exe dfnotes.exe
 
-    # --- MACOS SPECIFIC STEPS ---
+    # --- MACOS ---
     - name: Build (macOS)
       if: matrix.os == 'macos-latest'
       run: |
         cargo build --release
         cp target/release/dfnotes dfnotes-macos
 
-    # --- UPLOAD ARTIFACTS ---
-    - name: Upload Linux Artifacts
-      if: matrix.os == 'ubuntu-latest'
+    # --- UPLOAD ---
+    - name: Upload de Arquivos
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifact_name }}
@@ -72,17 +71,6 @@ jobs:
           dfnotes.deb
           dfnotes.rpm
           dfnotes.img
-
-    - name: Upload Windows Artifacts
-      if: matrix.os == 'windows-latest'
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.artifact_name }}
-        path: dfnotes.exe
-
-    - name: Upload macOS Artifacts
-      if: matrix.os == 'macos-latest'
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.artifact_name }}
-        path: dfnotes-macos
+          dfnotes.exe
+          dfnotes-macos
+        if-no-files-found: ignore
