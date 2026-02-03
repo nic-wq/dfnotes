@@ -1,3 +1,4 @@
+
 name: Multi-platform Release Packaging
 
 on:
@@ -34,11 +35,10 @@ jobs:
       - name: Build and Package Linux
         if: matrix.os == 'ubuntu-latest'
         run: |
-          # Install packaging tools
-          sudo apt-get update && sudo apt-get install -y fuse libfuse2
+          # Install dependencies and packaging tools
+          sudo apt-get update && sudo apt-get install -y fuse libfuse2 file
           cargo install cargo-deb cargo-generate-rpm
           
-          # Standard build
           cargo build --release
           
           # 1. Generate Debian package
@@ -48,21 +48,22 @@ jobs:
           cargo generate-rpm --output dfnotes-redhat.rpm
           
           # 3. Generate AppImage
-          # Using a simplified approach: downloading appimagetool
-          curl -LO https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage
-          chmod +x appimagetool-x86_64.AppImage
+          # Improved download for appimagetool
+          curl -L https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -o appimagetool
+          chmod +x appimagetool
           
-          # Create AppDir structure for AppImage
+          # Setup AppDir structure
           mkdir -p AppDir/usr/bin
           cp target/release/dfnotes AppDir/usr/bin/
           cp dfnotes.desktop AppDir/
           cp assets/dfnotes.png AppDir/
-          # Create a simple AppRun script
-          echo -e '#!/bin/sh\ncd "$(dirname "$0")"\nexec ./usr/bin/dfnotes "$@"' > AppDir/AppRun
+          
+          # Create AppRun script
+          echo -e '#!/bin/sh\nHERE="$(dirname "$(readlink -f "${0}")")"\nexec "${HERE}/usr/bin/dfnotes" "$@"' > AppDir/AppRun
           chmod +x AppDir/AppRun
           
-          # Run appimagetool
-          ARCH=x86_64 ./appimagetool-x86_64.AppImage AppDir dfnotes-appimage.appimage
+          # Build AppImage
+          ARCH=x86_64 ./appimagetool AppDir dfnotes-appimage.appimage
 
       # --- WINDOWS BUILD (.exe) ---
       - name: Build Windows
@@ -77,17 +78,16 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           cargo build --release
-          # Install dmgbuild to create a proper .dmg file
-          pip3 install dmgbuild
+          # Using --break-system-packages to bypass PEP 668 on CI
+          pip3 install dmgbuild --break-system-packages
           
-          # Create a folder to be packed into the DMG
           mkdir -p dist_macos
           cp target/release/dfnotes dist_macos/
           
-          # Generate the DMG
+          # Create DMG
           dmgbuild -s /dev/null -D app_folder=dist_macos "dfnotes" dfnotes-macos.dmg
 
-      # --- UPLOAD ALL ARTIFACTS ---
+      # --- UPLOAD ARTIFACTS ---
       - name: Upload Finished Artifacts
         uses: actions/upload-artifact@v4
         with:
