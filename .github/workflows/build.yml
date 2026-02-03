@@ -1,4 +1,4 @@
-name: Multi-platform Release Packaging
+name: Multi-platform Packaging
 
 on:
   push:
@@ -7,95 +7,70 @@ on:
 
 jobs:
   build:
-    name: Build for ${{ matrix.os }}
+    name: Build e Packaging
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: linux-artifacts
+            artifact_name: pacotes-linux
           - os: windows-latest
-            artifact_name: windows-artifacts
+            artifact_name: pacotes-windows
           - os: macos-latest
-            artifact_name: macos-artifacts
+            artifact_name: binario-macos
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout do código
+      uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
 
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2
 
-      # --- LINUX BUILD (Debian, RPM, AppImage) ---
-      - name: Build and Package Linux
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          # Install packaging tools
-          sudo apt-get update && sudo apt-get install -y fuse libfuse2
-          cargo install cargo-deb cargo-generate-rpm
-          
-          # Standard build
-          cargo build --release
-          
-          # 1. Generate Debian package
-          cargo deb --no-build --output dfnotes-debian.deb
-          
-          # 2. Generate RPM package
-          cargo generate-rpm --output dfnotes-redhat.rpm
-          
-          # 3. Generate AppImage
-          # Using a simplified approach: downloading appimagetool
-          curl -LO https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage
-          chmod +x appimagetool-x86_64.AppImage
-          
-          # Create AppDir structure for AppImage
-          mkdir -p AppDir/usr/bin
-          cp target/release/dfnotes AppDir/usr/bin/
-          cp dfnotes.desktop AppDir/
-          cp assets/dfnotes.png AppDir/
-          # Create a simple AppRun script
-          echo -e '#!/bin/sh\ncd "$(dirname "$0")"\nexec ./usr/bin/dfnotes "$@"' > AppDir/AppRun
-          chmod +x AppDir/AppRun
-          
-          # Run appimagetool
-          ARCH=x86_64 ./appimagetool-x86_64.AppImage AppDir dfnotes-appimage.appimage
+    # --- LINUX (Debian, RPM, IMG) ---
+    - name: Build e Pacotes (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        # Instala as ferramentas de empacotamento
+        cargo install cargo-deb cargo-generate-rpm
+        
+        cargo build --release
+        
+        # Gera o .deb
+        cargo deb --no-build --output dfnotes.deb
+        
+        # Gera o .rpm (agora com os metadados do Cargo.toml)
+        cargo generate-rpm --output dfnotes.rpm
+        
+        # Gera o .img (cópia simples do binário)
+        cp target/release/dfnotes dfnotes.img
 
-      # --- WINDOWS BUILD (.exe) ---
-      - name: Build Windows
-        if: matrix.os == 'windows-latest'
-        shell: bash
-        run: |
-          cargo build --release
-          cp target/release/dfnotes.exe dfnotes-windows.exe
+    # --- WINDOWS (.exe) ---
+    - name: Build (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        cargo build --release
+        copy target\release\dfnotes.exe dfnotes.exe
 
-      # --- MACOS BUILD (.dmg) ---
-      - name: Build and Package MacOS
-        if: matrix.os == 'macos-latest'
-        run: |
-          cargo build --release
-          # Install dmgbuild to create a proper .dmg file
-          pip3 install dmgbuild
-          
-          # Create a folder to be packed into the DMG
-          mkdir -p dist_macos
-          cp target/release/dfnotes dist_macos/
-          
-          # Generate the DMG
-          dmgbuild -s /dev/null -D app_folder=dist_macos "dfnotes" dfnotes-macos.dmg
+    # --- MACOS ---
+    - name: Build (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        cargo build --release
+        cp target/release/dfnotes dfnotes-macos
 
-      # --- UPLOAD ALL ARTIFACTS ---
-      - name: Upload Finished Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: |
-            dfnotes-debian.deb
-            dfnotes-redhat.rpm
-            dfnotes-appimage.appimage
-            dfnotes-windows.exe
-            dfnotes-macos.dmg
-          if-no-files-found: ignore
+    # --- UPLOAD ---
+    - name: Upload de Arquivos
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: |
+          dfnotes.deb
+          dfnotes.rpm
+          dfnotes.img
+          dfnotes.exe
+          dfnotes-macos
+        if-no-files-found: ignore
