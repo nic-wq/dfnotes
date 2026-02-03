@@ -7,21 +7,21 @@ on:
 
 jobs:
   build:
-    name: Build e Packaging
+    name: Build and Packaging
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: pacotes-linux
+            artifact_name: packages-linux
           - os: windows-latest
-            artifact_name: pacotes-windows
+            artifact_name: packages-windows
           - os: macos-latest
-            artifact_name: binario-macos
+            artifact_name: binary-macos
 
     steps:
-    - name: Checkout do código
+    - name: Checkout code
       uses: actions/checkout@v4
 
     - name: Install Rust toolchain
@@ -31,21 +31,21 @@ jobs:
       uses: Swatinem/rust-cache@v2
 
     # --- LINUX (Debian, RPM, IMG) ---
-    - name: Build e Pacotes (Linux)
+    - name: Build and Packages (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: |
-        # Instala as ferramentas de empacotamento
+        # Install packaging tools
         cargo install cargo-deb cargo-generate-rpm
         
         cargo build --release
         
-        # Gera o .deb
+        # Generate the .deb
         cargo deb --no-build --output dfnotes.deb
         
-        # Gera o .rpm (agora com os metadados do Cargo.toml)
+        # Generate the .rpm (now with Cargo.toml metadata)
         cargo generate-rpm --output dfnotes.rpm
         
-        # Gera o .img (cópia simples do binário)
+        # Generate the .img (simple copy of the binary)
         cp target/release/dfnotes dfnotes.img
 
     # --- WINDOWS (.exe) ---
@@ -63,7 +63,7 @@ jobs:
         cp target/release/dfnotes dfnotes-macos
 
     # --- UPLOAD ---
-    - name: Upload de Arquivos
+    - name: Upload Files
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifact_name }}
