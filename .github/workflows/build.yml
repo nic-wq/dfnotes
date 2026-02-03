@@ -1,9 +1,10 @@
-
 name: Multi-platform Release Packaging
 
 on:
   push:
-    branches: [ "main" ]
+    # O gatilho para release será quando você subir uma tag (ex: v1.0.0)
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -15,11 +16,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: linux-artifacts
+            platform: linux
           - os: windows-latest
-            artifact_name: windows-artifacts
+            platform: windows
           - os: macos-latest
-            artifact_name: macos-artifacts
+            platform: macos
 
     steps:
       - name: Checkout repository
@@ -31,41 +32,28 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      # --- LINUX BUILD (Debian, RPM, AppImage) ---
+      # --- LINUX BUILD ---
       - name: Build and Package Linux
         if: matrix.os == 'ubuntu-latest'
         run: |
-          # Install dependencies and packaging tools
           sudo apt-get update && sudo apt-get install -y fuse libfuse2 file
           cargo install cargo-deb cargo-generate-rpm
-          
           cargo build --release
-          
-          # 1. Generate Debian package
           cargo deb --no-build --output dfnotes-debian.deb
-          
-          # 2. Generate RPM package
           cargo generate-rpm --output dfnotes-redhat.rpm
           
-          # 3. Generate AppImage
-          # Improved download for appimagetool
+          # AppImage
           curl -L https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -o appimagetool
           chmod +x appimagetool
-          
-          # Setup AppDir structure
           mkdir -p AppDir/usr/bin
           cp target/release/dfnotes AppDir/usr/bin/
-          cp dfnotes.desktop AppDir/
-          cp assets/dfnotes.png AppDir/
-          
-          # Create AppRun script
+          cp dfnotes.desktop AppDir/ 2>/dev/null || touch AppDir/dfnotes.desktop
+          cp assets/dfnotes.png AppDir/ 2>/dev/null || touch AppDir/dfnotes.png
           echo -e '#!/bin/sh\nHERE="$(dirname "$(readlink -f "${0}")")"\nexec "${HERE}/usr/bin/dfnotes" "$@"' > AppDir/AppRun
           chmod +x AppDir/AppRun
-          
-          # Build AppImage
           ARCH=x86_64 ./appimagetool AppDir dfnotes-appimage.appimage
 
-      # --- WINDOWS BUILD (.exe) ---
+      # --- WINDOWS BUILD ---
       - name: Build Windows
         if: matrix.os == 'windows-latest'
         shell: bash
@@ -73,29 +61,38 @@ jobs:
           cargo build --release
           cp target/release/dfnotes.exe dfnotes-windows.exe
 
-      # --- MACOS BUILD (.dmg) ---
+      # --- MACOS BUILD ---
       - name: Build and Package MacOS
         if: matrix.os == 'macos-latest'
         run: |
           cargo build --release
-          # Using --break-system-packages to bypass PEP 668 on CI
           pip3 install dmgbuild --break-system-packages
-          
           mkdir -p dist_macos
           cp target/release/dfnotes dist_macos/
-          
-          # Create DMG
           dmgbuild -s /dev/null -D app_folder=dist_macos "dfnotes" dfnotes-macos.dmg
 
-      # --- UPLOAD ARTIFACTS ---
-      - name: Upload Finished Artifacts
-        uses: actions/upload-artifact@v4
+      # --- GENERATE HASHES ---
+      - name: Generate SHA-256 Hashes
+        shell: bash
+        run: |
+          for file in dfnotes-*; do
+            if [ -f "$file" ]; then
+              shasum -a 256 "$file" > "${file}.sha256"
+            fi
+          done
+
+      # --- UPLOAD TO RELEASE ---
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          name: ${{ matrix.artifact_name }}
-          path: |
+          files: |
             dfnotes-debian.deb
             dfnotes-redhat.rpm
             dfnotes-appimage.appimage
             dfnotes-windows.exe
             dfnotes-macos.dmg
-          if-no-files-found: ignore
+            dfnotes-*.sha256
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
